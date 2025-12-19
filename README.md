@@ -1,4 +1,4 @@
-# Case Studyn1
+# Case Study1
 
 - See instructions in the lecture notes
 
