@@ -16,7 +16,7 @@ python -m pip install -r minimalrequirements.txt
 ```
 
 # Usage
-- Run the program with python -m streamlit run src\mockup_ui.py`
+- Run the program with python -m streamlit run src\user1_interface.py
 - Updated in the code base take effect immediately as soon the change in the script is saved, no need to restart the server
 - The user interface is available at http://localhost:8501
 - Problems and print statements are shown in the terminal
