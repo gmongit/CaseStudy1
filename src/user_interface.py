@@ -1,12 +1,10 @@
 ﻿# user_interface.py
 import streamlit as st
 from datetime import datetime, timezone, date
-
 from users import User
 from devices import Device
 from repositories import UserRepo, DeviceRepo
 from db import now_utc, DB_FILE
-
 import inspect
 import streamlit as st
 
@@ -22,7 +20,6 @@ st.sidebar.title("Navigation")
 page = st.sidebar.radio("Bereich", ["Nutzerverwaltung", "Geräteverwaltung"])
 
 # Nutzerverwaltung
-
 if page == "Nutzerverwaltung":
     st.header("Nutzerverwaltung")
 

@@ -1,11 +1,9 @@
 # app/repositories.py
 from __future__ import annotations
-
 from tinydb import Query
 from db import get_db, now_utc
 from users import User
 from devices import Device
-
 
 
 class UserRepo:
@@ -27,7 +25,6 @@ class UserRepo:
     def delete(self, user_id: str) -> None:
         q = Query()
         self.table.remove(q.id == user_id)
-
 
 class DeviceRepo:
     """
