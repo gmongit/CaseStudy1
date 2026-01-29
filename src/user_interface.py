@@ -2,11 +2,15 @@
 import streamlit as st
 from datetime import datetime, timezone, date
 
-from app.models import User, Device
-from app.repositories import UserRepo, DeviceRepo
-from app.db import now_utc, DB_FILE
+from users import User
+from devices import Device
+from repositories import UserRepo, DeviceRepo
+from db import now_utc, DB_FILE
 
-# Wichtig: set_page_config muss vor anderen Streamlit-Kommandos stehen
+import inspect
+import streamlit as st
+
+
 st.set_page_config(page_title="Geräte- & Nutzerverwaltung", layout="wide")
 
 st.sidebar.caption(f"DB: {DB_FILE}")
@@ -17,9 +21,8 @@ device_repo = DeviceRepo()
 st.sidebar.title("Navigation")
 page = st.sidebar.radio("Bereich", ["Nutzerverwaltung", "Geräteverwaltung"])
 
-# --------------------------
 # Nutzerverwaltung
-# --------------------------
+
 if page == "Nutzerverwaltung":
     st.header("Nutzerverwaltung")
 
@@ -53,9 +56,7 @@ if page == "Nutzerverwaltung":
                 user_repo.delete(u.id)
                 st.rerun()
 
-# --------------------------
 # Geräteverwaltung
-# --------------------------
 elif page == "Geräteverwaltung":
     st.header("Geräteverwaltung")
 
@@ -77,11 +78,10 @@ elif page == "Geräteverwaltung":
 
     if selected == "(neu)":
         current = Device(
-            id=0,
+            id="0",
             name="",
             responsible_user_id=users[0].id,
-            creation_date=now_utc(),
-            last_update=now_utc(),
+            is_active=True,
             end_of_life=None,
         )
         is_new = True
@@ -89,15 +89,17 @@ elif page == "Geräteverwaltung":
         current = device_repo.get(int(selected))
         is_new = False
 
-    # Dropdown für Verantwortliche Person
+    has_eol_default = current.end_of_life is not None
+    eol_default_date = current.end_of_life.date() if current.end_of_life else date.today()
+
     user_map = {f"{u.name} ({u.id})": u.id for u in users}
     user_labels = list(user_map.keys())
     user_values = list(user_map.values())
     resp_index = user_values.index(current.responsible_user_id) if current.responsible_user_id in user_values else 0
 
-    # EOL Defaults
-    has_eol_default = bool(current.end_of_life)
-    eol_default_date = (current.end_of_life.date() if current.end_of_life else date.today())
+
+    has_eol = st.checkbox("EOL setzen", value=has_eol_default, key="has_eol")
+    eol_date = st.date_input("End of Life", value=eol_default_date, disabled=not has_eol, key="eol_date")
 
     with st.form("device_form"):
         # Inventarnummer: beim Anlegen nur freie IDs 1..20 auswählbar
@@ -131,9 +133,6 @@ elif page == "Geräteverwaltung":
         )
         responsible_id = user_map[responsible_label]
 
-        has_eol = st.checkbox("EOL setzen", value=has_eol_default)
-        eol_date = st.date_input("End of Life", value=eol_default_date, disabled=not has_eol)
-
         save = st.form_submit_button("Gerät speichern")
 
     if save:
@@ -154,16 +153,13 @@ elif page == "Geräteverwaltung":
 
         end_of_life_dt = None
         if has_eol:
-            # date -> datetime in UTC (00:00)
             end_of_life_dt = datetime(eol_date.year, eol_date.month, eol_date.day, tzinfo=timezone.utc)
 
         updated = Device(
-            id=inv_int,
+            id=str(inv_int),
             name=name.strip(),
             responsible_user_id=responsible_id,
-            # bei bestehendem Gerät creation_date beibehalten
-            creation_date=current.creation_date if not is_new else now_utc(),
-            last_update=now_utc(),
+            is_active=True,
             end_of_life=end_of_life_dt,
         )
 
@@ -173,6 +169,7 @@ elif page == "Geräteverwaltung":
             st.rerun()
         except ValueError as e:
             st.error(str(e))
+
 
     st.subheader("Alle Geräte")
     devices = device_repo.list_all()

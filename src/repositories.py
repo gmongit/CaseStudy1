@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 from tinydb import Query
-from app.db import get_db, now_utc
-from app.models import User, Device
+from db import get_db, now_utc
+from users import User
+from devices import Device
+
 
 
 class UserRepo:
@@ -90,7 +92,6 @@ class DeviceRepo:
         self.table.update(device.to_dict(), q.id == int(device.id))
 
     def upsert(self, device: Device) -> None:
-        """Praktisch für die UI: legt an, wenn noch nicht vorhanden, sonst update."""
         if self.get(int(device.id)) is None:
             self.create(device)
         else:
@@ -111,3 +112,26 @@ class DeviceRepo:
         self._validate_id(int(device_id))
         q = Query()
         self.table.remove(q.id == int(device_id))
+
+class ReservationRepo:
+    def __init__(self) -> None:
+        self.table = get_db().table("reservations")
+
+    def create(self, r: Reservation) -> None:
+        r.creation_date = now_utc()
+        r.last_update = now_utc()
+        self.table.insert(r.to_dict())
+
+    def delete(self, reservation_id: str) -> None:
+        q = Query()
+        self.table.remove(q.id == reservation_id)
+
+    def list_for_device(self, device_id: int) -> list[Reservation]:
+        q = Query()
+        rows = self.table.search(q.device_id == int(device_id))
+        return [Reservation.from_dict(d) for d in rows]
+
+    def find_overlaps(self, device_id: int, start: datetime, end: datetime) -> list[Reservation]:
+        # TinyDB kann nicht super SQL-mäßig interval overlap -> wir filtern in Python
+        reservations = self.list_for_device(device_id)
+        return [r for r in reservations if (start < r.end_date and end > r.start_date)]
