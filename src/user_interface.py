@@ -3,21 +3,19 @@ import streamlit as st
 from datetime import datetime, timezone, date
 from users import User
 from devices import Device
-from repositories import UserRepo, DeviceRepo
+from repositories import UserRepo, DeviceRepo, ReservationRepo 
+from reservation_service import ReservationService, ReservationError
 from db import now_utc, DB_FILE
 import inspect
-import streamlit as st
 
 
 st.set_page_config(page_title="Geräte- & Nutzerverwaltung", layout="wide")
-
-st.sidebar.caption(f"DB: {DB_FILE}")
 
 user_repo = UserRepo()
 device_repo = DeviceRepo()
 
 st.sidebar.title("Navigation")
-page = st.sidebar.radio("Bereich", ["Nutzerverwaltung", "Geräteverwaltung"])
+page = st.sidebar.radio("Bereich", ["Nutzerverwaltung", "Geräteverwaltung", "Reservierungen"])
 
 # Nutzerverwaltung
 if page == "Nutzerverwaltung":
@@ -175,3 +173,53 @@ elif page == "Geräteverwaltung":
     else:
         for d in sorted(devices, key=lambda x: int(x.id)):
             st.write(f"**{d.id}** – {d.name} | Verantwortlich: {d.responsible_user_id}")
+
+elif page == "Reservierungen":
+    st.header("Reservierungen")
+
+    res_service = ReservationService()
+    res_repo = ReservationRepo()
+
+    users = user_repo.list_all()
+    devices = device_repo.list_all()
+
+    if not users or not devices:
+        st.info("Bitte zuerst Nutzer und Geräte anlegen.")
+        st.stop()
+
+    device = st.selectbox("Gerät wählen", options=devices, format_func=lambda d: f"{d.id} – {d.name}")
+    user = st.selectbox("User wählen", options=users, format_func=lambda u: f"{u.id} – {u.name}")
+
+    st.subheader("Bestehende Reservierungen für dieses Gerät")
+    existing = sorted(res_repo.list_for_device(int(device.id)), key=lambda r: r.start_date)
+    if not existing:
+        st.write("Keine Reservierungen vorhanden.")
+    else:
+        for r in existing:
+            cols = st.columns([3, 3, 3, 1])
+            cols[0].write(r.user_id)
+            cols[1].write(str(r.start_date))
+            cols[2].write(str(r.end_date))
+            if cols[3].button("X", key=f"del_res_{r.id}"):
+                res_service.cancel(r.id)
+                st.rerun()
+
+    st.subheader("Neue Reservierung")
+    with st.form("create_reservation"):
+        start_d = st.date_input("Startdatum")
+        start_t = st.time_input("Startzeit")
+        end_d = st.date_input("Enddatum")
+        end_t = st.time_input("Endzeit")
+        submitted = st.form_submit_button("Reservieren")
+
+    if submitted:
+        start = datetime.combine(start_d, start_t, tzinfo=timezone.utc)
+        end = datetime.combine(end_d, end_t, tzinfo=timezone.utc)
+        try:
+            res_service.create(user.id, int(device.id), start, end)
+            st.success("Reservierung angelegt.")
+            st.rerun()
+        except ReservationError as e:
+            st.error(str(e))
+        except ValueError as e:
+            st.error(str(e))

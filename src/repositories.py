@@ -1,10 +1,12 @@
-# app/repositories.py...
+# app/repositories.py
 from __future__ import annotations
+
 from tinydb import Query
 from db import get_db, now_utc
 from users import User
 from devices import Device
-
+from datetime import datetime
+from reservations import Reservation
 
 class UserRepo:
     def __init__(self) -> None:
@@ -26,11 +28,10 @@ class UserRepo:
         q = Query()
         self.table.remove(q.id == user_id)
 
+
 class DeviceRepo:
     """
     Geräte-Repo auf TinyDB-Basis.
-
-    Business-Rule:
       - Inventarnummern sind auf 1..20 beschränkt.
       - create() darf keine bereits vergebene ID anlegen.
       - update() erhält creation_date, aktualisiert last_update.
@@ -41,7 +42,6 @@ class DeviceRepo:
         self.table = get_db().table("devices")
         self.user_repo = UserRepo()
 
-    # ---------- helpers ----------
     @classmethod
     def _validate_id(cls, device_id: int) -> None:
         if not (1 <= int(device_id) <= cls.MAX_IDS):
@@ -54,7 +54,6 @@ class DeviceRepo:
         existing = self.existing_ids()
         return [i for i in range(1, self.MAX_IDS + 1) if i not in existing]
 
-    # ---------- CRUD ----------
     def create(self, device: Device) -> None:
         device.id = int(device.id)
         self._validate_id(device.id)
@@ -101,8 +100,6 @@ class DeviceRepo:
         return Device.from_dict(d) if d else None
 
     def list_all(self) -> list[Device]:
-        # Absichtlich ohne validate_id, damit alte Daten (falls es mal größer war)
-        # noch angezeigt werden können.
         return [Device.from_dict(d) for d in self.table.all()]
 
     def delete(self, device_id: int) -> None:
@@ -129,6 +126,6 @@ class ReservationRepo:
         return [Reservation.from_dict(d) for d in rows]
 
     def find_overlaps(self, device_id: int, start: datetime, end: datetime) -> list[Reservation]:
-        # TinyDB kann nicht super SQL-mäßig interval overlap -> wir filtern in Python
+        # TinyDB kann nicht super SQL-mäßig interval overlap -> filtern in Python
         reservations = self.list_for_device(device_id)
         return [r for r in reservations if (start < r.end_date and end > r.start_date)]
